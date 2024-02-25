@@ -49,6 +49,7 @@ if __name__ == '__main__':
     print(len(all_images))
     if args.img_type == "vit":
         vit_model = timm.create_model("vit_base_patch16_384", pretrained=True, num_classes=0)
+        # vit_model = timm.create_model("vit_large_patch32_384", pretrained=True, num_classes=0)
         vit_model.eval()
     elif args.img_type == "detr":
         detr_model = torch.hub.load('cooelf/detr', 'detr_resnet101_dc5', pretrained=True)

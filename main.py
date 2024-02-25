@@ -7,7 +7,7 @@ import json
 import argparse
 import random
 from transformers import T5Tokenizer, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, T5ForConditionalGeneration
-from model import T5ForConditionalGeneration, T5ForMultimodalGeneration
+from model import T5ForMultimodalGeneration
 from utils_data import img_shape, load_data_std, load_data_img, ScienceQADatasetStd, ScienceQADatasetImg
 from utils_prompt import *
 from utils_evaluate import get_scores
@@ -44,10 +44,10 @@ def parse_args():
     parser.add_argument('--eval_le', type=str, default=None, help='generated rationale for the dev set')
     parser.add_argument('--test_le', type=str, default=None, help='generated rationale for the test set')
     parser.add_argument('--evaluate_dir', type=str, default=None, help='the directory of model for evaluation')
-    parser.add_argument('--caption_file', type=str, default='data/captions.json')
+    parser.add_argument('--caption_file', type=str, default='data/instruct_captions.json')
     parser.add_argument('--use_caption', action='store_true', help='use image captions or not')
     parser.add_argument('--prompt_format', type=str, default='QCM-A', help='prompt format template',
-                        choices=['QCM-A', 'QCM-LE', 'QCMG-A', 'QCM-LEA', 'QCM-ALE'])
+                        choices=['QCM-A', 'QCM-E', 'QCM-LE', 'QCMG-A', 'QCM-LEA', 'QCM-ALE'])
     parser.add_argument('--seed', type=int, default=42, help='random seed')
 
     args = parser.parse_args()
@@ -187,6 +187,7 @@ def T5Trainer(
     
     # rougel for rationale generation
     metric = evaluate.load("rouge")
+
     def postprocess_text(preds, labels):
         preds = [pred.strip() for pred in preds]
         labels = [label.strip() for label in labels]
@@ -249,9 +250,9 @@ def T5Trainer(
             per_device_eval_batch_size=args.eval_bs,
             weight_decay=0.01,
             num_train_epochs=args.epoch,
-            metric_for_best_model="accuracy" if args.prompt_format != "QCM-LE" else "rougeL",
+            metric_for_best_model="accuracy" if args.prompt_format == "QCMG-A" or args.prompt_format == "QCM-A" else "rougeL",
             predict_with_generate=args.use_generate,
-            load_best_model_at_end=True,
+            load_best_model_at_end=True, # 指定是否在训练结束时加载训练中发现的最佳模型
             report_to="none",
         )
 
@@ -262,7 +263,7 @@ def T5Trainer(
         eval_dataset=eval_set,
         data_collator=datacollator,
         tokenizer=tokenizer,
-        compute_metrics = compute_metrics_acc if args.prompt_format != "QCM-LE" else compute_metrics_rougel
+        compute_metrics = compute_metrics_acc if args.prompt_format == "QCMG-A" or args.prompt_format == "QCM-A" else compute_metrics_rougel
     )
 
     if args.evaluate_dir is None:
@@ -322,7 +323,7 @@ def T5Trainer(
             writer.write(json.dumps(output_data, indent=4))
     
     # generate the rationale for the eval set
-    if args.prompt_format == "QCM-LE":
+    if args.prompt_format == "QCM-LE" or args.prompt_format == "QCM-E":
         torch.cuda.empty_cache()
         del predict_results, preds, targets
         predict_results = trainer.predict(test_dataset=eval_set, max_length=args.output_len) 
