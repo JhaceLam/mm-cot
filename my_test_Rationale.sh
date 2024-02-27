@@ -3,4 +3,5 @@ CUDA_VISIBLE_DEVICES=0,1 python main.py \
     --user_msg rationale --img_type detr \
     --bs 8 --eval_bs 4 --eval_acc 4 --output_len 512 \
     --final_eval --prompt_format QCM-LE \
-    --evaluate_dir models/MM-CoT-UnifiedQA-base-Rationale
+    --evaluate_dir models/MM-CoT-UnifiedQA-base-Rationale \
+    --use_small_set --pass_evaluate

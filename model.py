@@ -27,12 +27,9 @@ class T5ForMultimodalGeneration(T5ForConditionalGeneration):
         r"decoder.block.0.layer.1.EncDecAttention.relative_attention_bias.weight",
     ]
 
-    def __init__(self, config: T5Config, patch_size, padding_idx, save_dir):
+    def __init__(self, config: T5Config, patch_size):
         super().__init__(config)
         self.model_dim = config.d_model
-        
-        self.padding_idx = padding_idx
-        self.out = open(os.path.join(save_dir, 'gate.txt'), 'w')
 
         self.shared = nn.Embedding(config.vocab_size, config.d_model)
         self.patch_num, self.patch_dim = patch_size

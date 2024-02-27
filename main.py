@@ -8,16 +8,16 @@ import argparse
 import random
 from transformers import T5Tokenizer, DataCollatorForSeq2Seq, Seq2SeqTrainingArguments, Seq2SeqTrainer, T5ForConditionalGeneration
 from model import T5ForMultimodalGeneration
-from utils_data import img_shape, load_data_std, load_data_img, ScienceQADatasetStd, ScienceQADatasetImg
+from utils_data import img_shape, load_data_std, load_data_img, ScienceQADatasetStd, ScienceQADatasetImg, ScienceQADatasetIterator
 from utils_prompt import *
 from utils_evaluate import get_scores
 from rich.table import Column, Table
 from rich import box
 from rich.console import Console
 console = Console(record=True)
-from torch import cuda
 import nltk
 import evaluate
+from collections import namedtuple
 
 
 def parse_args():
@@ -50,6 +50,12 @@ def parse_args():
                         choices=['QCM-A', 'QCM-E', 'QCM-LE', 'QCMG-A', 'QCM-LEA', 'QCM-ALE'])
     parser.add_argument('--seed', type=int, default=42, help='random seed')
 
+    parser.add_argument('--use_small_set', action='store_true', help='For dev: use smaller test_set and eval_set')
+    parser.add_argument('--pass_evaluate', action='store_true', help='For dev')
+    parser.add_argument('--pass_predict_test', action='store_true', help='For dev')
+    parser.add_argument('--pass_predict_eval', action='store_true', help='For dev')
+
+
     args = parser.parse_args()
     return args
         
@@ -72,6 +78,13 @@ def T5Trainer(
     train_qids = qids['train']
     test_qids = qids['test']
     val_qids = qids['val']
+
+    if args.use_small_set:
+        print('*' * 20)
+        print('Warning: Small test_set and val_set are being used!')
+        print('*' * 20)
+        test_qids = test_qids[0: 100]
+        val_qids = val_qids[0: 100]
     
     if args.evaluate_dir is not None:
         save_dir = args.evaluate_dir
@@ -82,10 +95,9 @@ def T5Trainer(
         if not os.path.exists(save_dir):
             os.mkdir(save_dir)
 
-    padding_idx = tokenizer._convert_token_to_id(tokenizer.pad_token)
     if args.img_type is not None:
         patch_size = img_shape[args.img_type]
-        model = T5ForMultimodalGeneration.from_pretrained(args.model, patch_size=patch_size, padding_idx=padding_idx, save_dir=save_dir) 
+        model = T5ForMultimodalGeneration.from_pretrained(args.model, patch_size=patch_size) 
         name_maps = dataframe['name_maps'] 
         image_features = dataframe['image_features']
         train_set = ScienceQADatasetImg(
@@ -232,6 +244,7 @@ def T5Trainer(
             weight_decay=0.01,
             num_train_epochs=args.epoch,
             predict_with_generate=args.use_generate,
+            generation_max_length=args.output_len,
             report_to="none",
         )
     # evaluate at each epoch
@@ -252,6 +265,7 @@ def T5Trainer(
             num_train_epochs=args.epoch,
             metric_for_best_model="accuracy" if args.prompt_format == "QCMG-A" or args.prompt_format == "QCM-A" else "rougeL",
             predict_with_generate=args.use_generate,
+            generation_max_length=args.output_len,
             load_best_model_at_end=True, # 指定是否在训练结束时加载训练中发现的最佳模型
             report_to="none",
         )
@@ -269,84 +283,201 @@ def T5Trainer(
     if args.evaluate_dir is None:
         trainer.train()
         trainer.save_model(save_dir)
-        
-    metrics = trainer.evaluate(eval_dataset = test_set)
-    trainer.log_metrics("test", metrics)
-    trainer.save_metrics("test", metrics)
-
-    predict_results = trainer.predict(test_dataset=test_set, max_length=args.output_len) 
-    if trainer.is_world_process_zero():
-        if args.use_generate:
-            preds, targets = predict_results.predictions, predict_results.label_ids
-        else:
-            preds = predict_results.predictions[0]
-            targets = predict_results.label_ids
-            preds = preds.argmax(axis=2)
-
-        preds = tokenizer.batch_decode(
-            preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
-        )
-        targets = tokenizer.batch_decode(
-            targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
-        )
-
-        results_ans = {}
-        results_rationale = {}
-        results_reference = {}
-        
-        num_fail = 0
-        for idx, qid in enumerate(test_qids):
-            pred = preds[int(idx)]
-            ref = targets[int(idx)]
-            extract_pred = extract_ans(pred)
-            if extract_pred != "FAILED":
-                if extract_pred in args.options:
-                    extract_pred = args.options.index(extract_pred)
-                else:
-                    extract_pred = random.choice(range(0,len(args.options)))
-            else:
-                num_fail += 1
-                extract_pred = random.choice(range(len(args.options))) # random choose one option
-            results_ans[str(qid)] = extract_pred
-            results_rationale[str(qid)] = pred
-            results_reference[str(qid)] = ref
-
-        scores = get_scores(results_ans, results_rationale, results_reference, os.path.join(args.data_root, "scienceqa/problems.json"))
-        preds = [pred.strip() for pred in preds]
-        output_data = {
-                "num_fail": num_fail,
-                "scores": scores,
-                "preds": preds,
-                 "labels": targets}
-        output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
-        with open(output_prediction_file, "w") as writer:
-            writer.write(json.dumps(output_data, indent=4))
     
-    # generate the rationale for the eval set
-    if args.prompt_format == "QCM-LE" or args.prompt_format == "QCM-E":
-        torch.cuda.empty_cache()
-        del predict_results, preds, targets
-        predict_results = trainer.predict(test_dataset=eval_set, max_length=args.output_len) 
-        if trainer.is_world_process_zero():
-            if args.use_generate:
-                preds, targets = predict_results.predictions, predict_results.label_ids
-            else:
-                preds = predict_results.predictions[0]
-                targets = predict_results.label_ids
-                preds = preds.argmax(axis=2)
 
-            preds = tokenizer.batch_decode(
-                preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
-            )
-            targets = tokenizer.batch_decode(
-                targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
-            )
+    # metrics = trainer.evaluate(eval_dataset = test_set, max_length=args.output_len)
+    if not args.pass_evaluate:
+        test_set_iterator = ScienceQADatasetIterator(dataset=test_set, batch_size = 50 if args.use_small_set else 500)
+        batch_index = 1
+
+        eval_metrics = {}
+        eval_sizes = {}
+        for batch in test_set_iterator:
+            batch_metrics = trainer.evaluate(eval_dataset=batch, max_length=args.output_len)
+            for key, value in batch_metrics.items():
+                if key not in eval_metrics:
+                    eval_metrics[key] = []
+                    eval_sizes[key] = []
+                eval_metrics[key].append(value)
+                eval_sizes[key].append(len(batch))
+
+            print(f"Evaluated batches: {batch_index}/{test_set_iterator.num_batches}")
+            if batch_index == 0:
+                break
+            batch_index += 1
+        
+        for key, value in eval_metrics.items():
+            # eval_metrics[key] = sum(value) / len(value)
+            eval_metrics[key] = sum(np.multiply(eval_metrics[key], eval_sizes[key])) / sum(eval_sizes[key])
+    
+        metrics = eval_metrics
+        trainer.log_metrics("test", metrics)
+        trainer.save_metrics("test", metrics)
+        print(eval_metrics)
+
+
+    def batch_predict(dataset, batch_size=50, interrupt_after=0):        
+        dataset_iterator = ScienceQADatasetIterator(dataset=dataset, batch_size=batch_size)
+        full_preds = []
+        full_targets = []
+
+        batch_index = 1
+        for batch in dataset_iterator:
+            batch_predict_results = trainer.predict(test_dataset=batch, max_length=args.output_len)
+
+            if trainer.is_world_process_zero():
+                if args.use_generate:
+                    batch_preds, batch_targets = batch_predict_results.predictions, batch_predict_results.label_ids
+                else:
+                    batch_preds = batch_predict_results.predictions[0]
+                    batch_targets = batch_predict_results.label_ids
+                    batch_preds = batch_preds.argmax(axis=2)
+
+                batch_preds = tokenizer.batch_decode(
+                    batch_preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                )
+                batch_targets = tokenizer.batch_decode(
+                    batch_targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
+                )
+
+                full_preds.extend(batch_preds)
+                full_targets.extend(batch_targets)
+            
+            print(f"Predicted batches: {batch_index}/{dataset_iterator.num_batches}")
+
+            if batch_index == interrupt_after:
+                break
+            batch_index += 1
+        
+        return full_preds, full_targets
+
+
+    # predict_results = trainer.predict(test_dataset=test_set, max_length=args.output_len) 
+    if not args.pass_predict_test:
+        preds, targets = batch_predict(test_set, batch_size = 50 if args.use_small_set else 500)
+        if trainer.is_world_process_zero():
+            results_ans = {}
+            results_rationale = {}
+            results_reference = {}
+            
+            num_fail = 0
+            for idx, qid in enumerate(test_qids):
+                pred = preds[int(idx)]
+                ref = targets[int(idx)]
+                extract_pred = extract_ans(pred)
+
+                if num_fail == 5:
+                    print('pred: ')
+                    print(pred)
+                    print('\nref:')
+                    print(ref)
+                    print('\nextract_pred')
+                    print(extract_pred)
+                    print('\n')
+
+                if extract_pred != "FAILED":
+                    if extract_pred in args.options:
+                        extract_pred = args.options.index(extract_pred)
+                    else:
+                        extract_pred = random.choice(range(0,len(args.options)))
+                else:
+                    num_fail += 1
+                    extract_pred = random.choice(range(len(args.options))) # random choose one option
+                results_ans[str(qid)] = extract_pred
+                results_rationale[str(qid)] = pred
+                results_reference[str(qid)] = ref
+
+            scores = get_scores(results_ans, results_rationale, results_reference, os.path.join(args.data_root, "scienceqa/problems.json"), args.use_small_set)
+            preds = [pred.strip() for pred in preds]
+            output_data = {
+                    "num_fail": num_fail,
+                    "scores": scores,
+                    "preds": preds,
+                    "labels": targets}
+            output_prediction_file = os.path.join(save_dir,"my_predictions_ans_test.json")
+            with open(output_prediction_file, "w") as writer:
+                writer.write(json.dumps(output_data, indent=4))
+            print('Generated predictions_ans_test.json')
+
+    # if trainer.is_world_process_zero():
+    #     if args.use_generate:
+    #         preds, targets = predict_results.predictions, predict_results.label_ids
+    #     else:
+    #         preds = predict_results.predictions[0]
+    #         targets = predict_results.label_ids
+    #         preds = preds.argmax(axis=2)
+
+    #     preds = tokenizer.batch_decode(
+    #         preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
+    #     )
+    #     targets = tokenizer.batch_decode(
+    #         targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
+    #     )
+
+    #     results_ans = {}
+    #     results_rationale = {}
+    #     results_reference = {}
+        
+    #     num_fail = 0
+    #     for idx, qid in enumerate(test_qids):
+    #         pred = preds[int(idx)]
+    #         ref = targets[int(idx)]
+    #         extract_pred = extract_ans(pred)
+    #         if extract_pred != "FAILED":
+    #             if extract_pred in args.options:
+    #                 extract_pred = args.options.index(extract_pred)
+    #             else:
+    #                 extract_pred = random.choice(range(0,len(args.options)))
+    #         else:
+    #             num_fail += 1
+    #             extract_pred = random.choice(range(len(args.options))) # random choose one option
+    #         results_ans[str(qid)] = extract_pred
+    #         results_rationale[str(qid)] = pred
+    #         results_reference[str(qid)] = ref
+
+    #     scores = get_scores(results_ans, results_rationale, results_reference, os.path.join(args.data_root, "scienceqa/problems.json"))
+    #     preds = [pred.strip() for pred in preds]
+    #     output_data = {
+    #             "num_fail": num_fail,
+    #             "scores": scores,
+    #             "preds": preds,
+    #              "labels": targets}
+    #     output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
+    #     with open(output_prediction_file, "w") as writer:
+    #         writer.write(json.dumps(output_data, indent=4))
+    #     print('Generated predictions_ans_test.json')
+    
+
+    # generate the rationale for the eval set
+    if (args.prompt_format == "QCM-LE" or args.prompt_format == "QCM-E") and not args.pass_predict_eval:
+        torch.cuda.empty_cache()
+        # del predict_results, preds, targets
+        # del preds, targets
+
+        # predict_results = trainer.predict(test_dataset=eval_set, max_length=args.output_len) 
+        preds, targets = batch_predict(eval_set, batch_size = 50 if args.use_small_set else 500)
+
+        if trainer.is_world_process_zero():
+            # if args.use_generate:
+            #     preds, targets = predict_results.predictions, predict_results.label_ids
+            # else:
+            #     preds = predict_results.predictions[0]
+            #     targets = predict_results.label_ids
+            #     preds = preds.argmax(axis=2)
+
+            # preds = tokenizer.batch_decode(
+            #     preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
+            # )
+            # targets = tokenizer.batch_decode(
+            #     targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
+            # )
             preds = [pred.strip() for pred in preds]
             output_data = {"preds": preds,
                  "labels": targets}
-            output_prediction_file = os.path.join(save_dir,"predictions_ans_eval.json")
+            output_prediction_file = os.path.join(save_dir,"my_predictions_ans_eval.json")
             with open(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(output_data, indent=4))
+        print('Generated predictions_ans_eval.json')
     
 
 if __name__ == '__main__':
