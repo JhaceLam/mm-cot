@@ -1,4 +1,4 @@
-args Namespace(bs=8, caption_file='data/instruct_captions.json', data_root='data', epoch=20, eval_acc=4, eval_bs=4, eval_le=None, evaluate_dir='models/MM-CoT-UnifiedQA-base-Rationale', final_eval=True, img_type='detr', input_len=512, lr=5e-05, model='allenai/unifiedqa-t5-base', options=['A', 'B', 'C', 'D', 'E'], output_dir='experiments', output_len=512, pass_evaluate=True, pass_predict_eval=False, pass_predict_test=False, prompt_format='QCM-LE', seed=42, test_le=None, test_split='test', train_split='train', use_caption=False, use_generate=False, use_small_set=True, user_msg='rationale', val_split='val')
+args Namespace(bs=8, caption_file='data/instruct_captions.json', data_root='data', epoch=20, eval_acc=10, eval_bs=4, eval_le=None, evaluate_dir='models/MM-CoT-UnifiedQA-base-Rationale', final_eval=True, img_type='detr', input_len=512, lr=5e-05, model='allenai/unifiedqa-t5-base', options=['A', 'B', 'C', 'D', 'E'], output_dir='experiments', output_len=512, pass_evaluate=False, pass_predict_eval=False, pass_predict_test=False, prompt_format='QCM-LE', seed=42, test_le=None, test_split='test', train_split='train', use_caption=False, use_generate=False, use_small_set=True, user_msg='rationale', val_split='val')
 ====Input Arguments====
 {
   "data_root": "data",
@@ -17,7 +17,7 @@ args Namespace(bs=8, caption_file='data/instruct_captions.json', data_root='data
   "input_len": 512,
   "output_len": 512,
   "eval_bs": 4,
-  "eval_acc": 4,
+  "eval_acc": 10,
   "train_split": "train",
   "val_split": "val",
   "test_split": "test",
@@ -33,7 +33,7 @@ args Namespace(bs=8, caption_file='data/instruct_captions.json', data_root='data
   "prompt_format": "QCM-LE",
   "seed": 42,
   "use_small_set": true,
-  "pass_evaluate": true,
+  "pass_evaluate": false,
   "pass_predict_test": false,
   "pass_predict_eval": false
 }
@@ -44,7 +44,7 @@ number of val problems: 4241
 
 number of test problems: 4241
 
-[09:10:36] [Model]: Loading models/MM-CoT-UnifiedQA-base-Rationale...                                                                                                                                                                main.py:74
+[17:17:23] [Model]: Loading models/MM-CoT-UnifiedQA-base-Rationale...                                                                                                                                                                main.py:74
                                                                                                                                                                                                                                                
            [Data]: Reading data...                                                                                                                                                                                                   main.py:75
                                                                                                                                                                                                                                                
@@ -52,23 +52,31 @@ number of test problems: 4241
 Warning: Small test_set and val_set are being used!
 ********************
 model parameters:  226643712
-  0%|          | 0/7 [00:00<?, ?it/s] 29%|██▊       | 2/7 [00:00<00:00,  8.05it/s] 43%|████▎     | 3/7 [00:00<00:00,  5.88it/s] 57%|█████▋    | 4/7 [00:00<00:00,  5.26it/s] 71%|███████▏  | 5/7 [00:02<00:01,  1.45it/s] 86%|████████▌ | 6/7 [00:02<00:00,  1.85it/s]100%|██████████| 7/7 [00:02<00:00,  2.42it/s]100%|██████████| 7/7 [00:27<00:00,  3.97s/it]
-Predicted batches: 1/2
-  0%|          | 0/7 [00:00<?, ?it/s] 29%|██▊       | 2/7 [00:00<00:00,  7.87it/s] 43%|████▎     | 3/7 [00:00<00:00,  5.77it/s] 57%|█████▋    | 4/7 [00:00<00:00,  3.94it/s] 71%|███████▏  | 5/7 [00:02<00:01,  1.30it/s] 86%|████████▌ | 6/7 [00:02<00:00,  1.70it/s]100%|██████████| 7/7 [00:02<00:00,  2.25it/s]100%|██████████| 7/7 [00:29<00:00,  4.17s/it]
-Predicted batches: 2/2
-pred: 
-Solution: A food web is a model.nA food web shows where organisms in an ecosystem get their food. Models can make things in nature easier to understand because models can represent complex things in a simpler way. If a food web showed every organism in an ecosystem, the food web would be hard to understand. So, each food web shows how some organisms in an ecosystem can get their food.nArrows show how matter moves.nA food web has arrows that point from one organism to another. Each arrow shows the direction that matter moves when one organism eats another organism. An arrow starts from the organism that is eaten. The arrow points to the organism that is doing the eating.nAn organism in a food web can have more than one arrow pointing from it. This shows that the organism is eaten by more than one other organism in the food web.nAn organism in a food web can also have more than one arrow pointing to it. This shows that the organism eats more than one other organism in the food web. Use the arrows to follow how matter moves through this food web. For each answer choice, try to find a path of arrows that starts from the lichen.TherenThe arrow points to the bilberry. So, in this food web, matter does not move from the lichen to the mushroombilberry. There
-
-ref:
-Solution: A food web is a model.nA food web shows where organisms in an ecosystem get their food. Models can make things in nature easier to understand because models can represent complex things in a simpler way. If a food web showed every organism in an ecosystem, the food web would be hard to understand. So, each food web shows how some organisms in an ecosystem can get their food.nArrows show how matter moves.nA food web has arrows that point from one organism to another. Each arrow shows the direction that matter moves when one organism eats another organism. An arrow starts from the organism that is eaten. The arrow points to the organism that is doing the eating.nAn organism in a food web can have more than one arrow pointing from it. This shows that the organism is eaten by more than one other organism in the food web.nAn organism in a food web can also have more than one arrow pointing to it. This shows that the organism eats more than one other organism in the food web. Use the arrows to follow how matter moves through this food web. For each answer choice, try to find a path of arrows that starts from the lichen.nNo arrow points to the bilberry. So, in this food web, matter does not move from the lichen to the bilberry..
-
-extract_pred
-FAILED
-
-
-Generated predictions_ans_test.json
-  0%|          | 0/7 [00:00<?, ?it/s] 29%|██▊       | 2/7 [00:00<00:00,  9.02it/s] 43%|████▎     | 3/7 [00:00<00:00,  6.37it/s] 57%|█████▋    | 4/7 [00:00<00:00,  5.48it/s] 71%|███████▏  | 5/7 [00:02<00:01,  1.42it/s] 86%|████████▌ | 6/7 [00:02<00:00,  1.84it/s]100%|██████████| 7/7 [00:02<00:00,  2.39it/s]100%|██████████| 7/7 [00:28<00:00,  4.03s/it]
-Predicted batches: 1/2
-  0%|          | 0/7 [00:00<?, ?it/s] 29%|██▊       | 2/7 [00:00<00:00,  8.46it/s] 43%|████▎     | 3/7 [00:00<00:00,  5.85it/s] 57%|█████▋    | 4/7 [00:00<00:00,  5.01it/s] 71%|███████▏  | 5/7 [00:02<00:01,  1.18it/s] 86%|████████▌ | 6/7 [00:03<00:00,  1.54it/s]100%|██████████| 7/7 [00:03<00:00,  2.08it/s]100%|██████████| 7/7 [00:33<00:00,  4.74s/it]
-Predicted batches: 2/2
-Generated predictions_ans_eval.json
+Traceback (most recent call last):
+  File "main.py", line 443, in <module>
+    T5Trainer(
+  File "main.py", line 298, in T5Trainer
+    batch_metrics = trainer.evaluate(eval_dataset=batch, max_length=args.output_len)
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/trainer_seq2seq.py", line 159, in evaluate
+    return super().evaluate(eval_dataset, ignore_keys=ignore_keys, metric_key_prefix=metric_key_prefix)
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/trainer.py", line 3043, in evaluate
+    output = eval_loop(
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/trainer.py", line 3235, in evaluation_loop
+    loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/trainer_seq2seq.py", line 276, in prediction_step
+    generated_tokens = self.model.generate(**inputs, **gen_kwargs)
+  File "/root/miniconda3/lib/python3.8/site-packages/torch/utils/_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/generation/utils.py", line 1611, in generate
+    return self.beam_search(
+  File "/root/miniconda3/lib/python3.8/site-packages/transformers/generation/utils.py", line 2909, in beam_search
+    outputs = self(
+  File "/root/miniconda3/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/mm-cot-v1/model.py", line 115, in forward
+    image_embedding = self.image_dense(image_ids)
+  File "/root/miniconda3/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/miniconda3/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 114, in forward
+    return F.linear(input, self.weight, self.bias)
+TypeError: linear(): argument 'input' (position 1) must be Tensor, not NoneType

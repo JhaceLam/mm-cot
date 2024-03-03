@@ -244,6 +244,8 @@ def T5Trainer(
             weight_decay=0.01,
             num_train_epochs=args.epoch,
             predict_with_generate=args.use_generate,
+            # predict_with_generate=True,
+            # generation_num_beams=3,
             generation_max_length=args.output_len,
             report_to="none",
         )
@@ -365,16 +367,6 @@ def T5Trainer(
                 pred = preds[int(idx)]
                 ref = targets[int(idx)]
                 extract_pred = extract_ans(pred)
-
-                if num_fail == 5:
-                    print('pred: ')
-                    print(pred)
-                    print('\nref:')
-                    print(ref)
-                    print('\nextract_pred')
-                    print(extract_pred)
-                    print('\n')
-
                 if extract_pred != "FAILED":
                     if extract_pred in args.options:
                         extract_pred = args.options.index(extract_pred)
@@ -395,82 +387,21 @@ def T5Trainer(
                     "preds": preds,
                     "labels": targets}
             output_prediction_file = os.path.join(save_dir,"my_predictions_ans_test.json")
+            # output_prediction_file = os.path.join(save_dir, f"../../predictions_ans_test_seed{args.seed}.json")
             with open(output_prediction_file, "w") as writer:
                 writer.write(json.dumps(output_data, indent=4))
             print('Generated predictions_ans_test.json')
-
-    # if trainer.is_world_process_zero():
-    #     if args.use_generate:
-    #         preds, targets = predict_results.predictions, predict_results.label_ids
-    #     else:
-    #         preds = predict_results.predictions[0]
-    #         targets = predict_results.label_ids
-    #         preds = preds.argmax(axis=2)
-
-    #     preds = tokenizer.batch_decode(
-    #         preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
-    #     )
-    #     targets = tokenizer.batch_decode(
-    #         targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
-    #     )
-
-    #     results_ans = {}
-    #     results_rationale = {}
-    #     results_reference = {}
-        
-    #     num_fail = 0
-    #     for idx, qid in enumerate(test_qids):
-    #         pred = preds[int(idx)]
-    #         ref = targets[int(idx)]
-    #         extract_pred = extract_ans(pred)
-    #         if extract_pred != "FAILED":
-    #             if extract_pred in args.options:
-    #                 extract_pred = args.options.index(extract_pred)
-    #             else:
-    #                 extract_pred = random.choice(range(0,len(args.options)))
-    #         else:
-    #             num_fail += 1
-    #             extract_pred = random.choice(range(len(args.options))) # random choose one option
-    #         results_ans[str(qid)] = extract_pred
-    #         results_rationale[str(qid)] = pred
-    #         results_reference[str(qid)] = ref
-
-    #     scores = get_scores(results_ans, results_rationale, results_reference, os.path.join(args.data_root, "scienceqa/problems.json"))
-    #     preds = [pred.strip() for pred in preds]
-    #     output_data = {
-    #             "num_fail": num_fail,
-    #             "scores": scores,
-    #             "preds": preds,
-    #              "labels": targets}
-    #     output_prediction_file = os.path.join(save_dir,"predictions_ans_test.json")
-    #     with open(output_prediction_file, "w") as writer:
-    #         writer.write(json.dumps(output_data, indent=4))
-    #     print('Generated predictions_ans_test.json')
     
 
     # generate the rationale for the eval set
     if (args.prompt_format == "QCM-LE" or args.prompt_format == "QCM-E") and not args.pass_predict_eval:
         torch.cuda.empty_cache()
         # del predict_results, preds, targets
-        # del preds, targets
 
         # predict_results = trainer.predict(test_dataset=eval_set, max_length=args.output_len) 
         preds, targets = batch_predict(eval_set, batch_size = 50 if args.use_small_set else 500)
 
         if trainer.is_world_process_zero():
-            # if args.use_generate:
-            #     preds, targets = predict_results.predictions, predict_results.label_ids
-            # else:
-            #     preds = predict_results.predictions[0]
-            #     targets = predict_results.label_ids
-            #     preds = preds.argmax(axis=2)
-
-            # preds = tokenizer.batch_decode(
-            #     preds, skip_special_tokens=True, clean_up_tokenization_spaces=True
-            # )
-            # targets = tokenizer.batch_decode(
-            #     targets, skip_special_tokens=True, clean_up_tokenization_spaces=True
-            # )
             preds = [pred.strip() for pred in preds]
             output_data = {"preds": preds,
                  "labels": targets}
